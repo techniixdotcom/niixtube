@@ -4,8 +4,7 @@ Only show Subscribed Channel videos
 Remove Shorts
 Continues Play (addon/extension interacts with continue play popup)
 Extension handles Enqueue and has Enqueue Next function
-
-bugged: Grey out watched videos (user defines threshold in %)
+Grey out watched videos (user defines threshold in %)
 
 
 INSTALL:
