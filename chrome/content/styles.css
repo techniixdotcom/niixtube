@@ -1,0 +1,131 @@
+.niixtube-watched {
+  opacity: 0.35;
+  filter: grayscale(85%);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.niixtube-watched:hover {
+  opacity: 0.8;
+  filter: grayscale(35%);
+}
+
+.niixtube-hidden-nonsub {
+  display: none !important;
+}
+
+.niixtube-thumb-relative {
+  position: relative;
+}
+
+html.niixtube-hide-shorts ytd-reel-shelf-renderer,
+html.niixtube-hide-shorts ytd-rich-shelf-renderer[is-shorts],
+html.niixtube-hide-shorts ytd-mini-guide-entry-renderer a[aria-label="Shorts"],
+html.niixtube-hide-shorts ytd-guide-entry-renderer a[title="Shorts"],
+html.niixtube-hide-shorts #shorts-container,
+html.niixtube-hide-shorts ytd-reel-video-renderer,
+html.niixtube-hide-shorts [is-shorts] {
+  display: none !important;
+}
+
+.niixtube-enqueue-wrap {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 4px;
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+ytd-thumbnail:hover .niixtube-enqueue-wrap,
+a#thumbnail:hover .niixtube-enqueue-wrap {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#top-level-buttons-computed .niixtube-enqueue-wrap,
+#menu-container .niixtube-enqueue-wrap,
+ytd-menu-renderer#menu .niixtube-enqueue-wrap {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+  margin-left: 8px;
+  /* Match the height and baseline of YouTube's own action-button row
+     instead of auto-sizing off our own padding, which is what made the
+     buttons look visibly off-size/off-baseline next to Like/Share. */
+  height: 36px;
+  align-items: center;
+}
+
+.niixtube-enqueue-btn,
+.niixtube-enqueue-next-btn {
+  background: rgba(15, 15, 15, 0.85);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.4;
+  font-family: "Roboto", Arial, sans-serif;
+  white-space: nowrap;
+}
+
+.niixtube-verbose .niixtube-enqueue-btn,
+.niixtube-verbose .niixtube-enqueue-next-btn {
+  /* Sized to YouTube's real 36px pill button and pulled from YouTube's own
+     CSS variables where available, so it follows light/dark theme instead
+     of a single hardcoded dark color that looked out of place in light mode. */
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 18px;
+  background: var(--yt-spec-badge-chip-background, #272727);
+  color: var(--yt-spec-text-primary, #ffffff);
+  border: none;
+  box-sizing: border-box;
+}
+
+.niixtube-enqueue-btn:hover,
+.niixtube-enqueue-next-btn:hover {
+  background: rgba(204, 0, 0, 0.9);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.niixtube-verbose .niixtube-enqueue-btn:hover,
+.niixtube-verbose .niixtube-enqueue-next-btn:hover {
+  background: var(--yt-spec-badge-chip-background-hover, rgba(204, 0, 0, 0.9));
+}
+
+.niixtube-flash {
+  background: rgba(35, 134, 54, 0.95) !important;
+}
+
+#niixtube-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translate(-50%, 12px);
+  background: #1e1e1e;
+  color: #ffffff;
+  border: 1px solid #3f3f3f;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-family: "Roboto", Arial, sans-serif;
+  z-index: 999999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#niixtube-toast.niixtube-toast-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
