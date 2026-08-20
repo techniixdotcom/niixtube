@@ -1,9 +1,13 @@
 everything can be toggled on and off:
 
 Only show Subscribed Channel videos
+
 Remove Shorts
+
 Continues Play (addon/extension interacts with continue play popup)
+
 Extension handles Enqueue and has Enqueue Next function
+
 Grey out watched videos (user defines threshold in %)
 
 
