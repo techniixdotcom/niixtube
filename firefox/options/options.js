@@ -3,6 +3,7 @@
 const DEFAULT_SETTINGS = {
   subscriptionsOnlyHome: true,
   greyOutWatched: true,
+  watchedBadge: true,
   hideShorts: true,
   autoContinueWatching: true,
   enqueueEnabled: true,
@@ -12,6 +13,7 @@ const DEFAULT_SETTINGS = {
 const CHECKBOX_FIELDS = [
   'subscriptionsOnlyHome',
   'greyOutWatched',
+  'watchedBadge',
   'hideShorts',
   'autoContinueWatching',
   'enqueueEnabled'

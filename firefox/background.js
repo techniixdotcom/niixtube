@@ -9,6 +9,7 @@ if (typeof browser === 'undefined' && typeof importScripts === 'function') {
 const DEFAULT_SETTINGS = {
   subscriptionsOnlyHome: true,
   greyOutWatched: true,
+  watchedBadge: true,
   hideShorts: true,
   autoContinueWatching: true,
   enqueueEnabled: true,
@@ -17,6 +18,11 @@ const DEFAULT_SETTINGS = {
 
 const MENU_ADD_ID = 'niixtube-enqueue';
 const MENU_NEXT_ID = 'niixtube-enqueue-next';
+// YouTube video IDs are always 11 chars of [A-Za-z0-9_-], but this is kept
+// a little loose (6-15) to tolerate any future format change without
+// breaking outright - it's a sanity check against malformed/unexpected
+// values reaching a fetch() or constructed URL, not a strict spec match.
+const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,15}$/;
 
 async function getSettings() {
   const stored = await browser.storage.local.get('settings');
@@ -107,9 +113,10 @@ function extractVideoIdFromUrl(url) {
   if (!url) return null;
   try {
     const u = new URL(url);
-    if (u.pathname === '/watch') return u.searchParams.get('v');
-    if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2] || null;
-    return null;
+    let id = null;
+    if (u.pathname === '/watch') id = u.searchParams.get('v');
+    else if (u.pathname.startsWith('/shorts/')) id = u.pathname.split('/')[2] || null;
+    return id && VIDEO_ID_PATTERN.test(id) ? id : null;
   } catch (err) {
     return null;
   }
@@ -117,22 +124,36 @@ function extractVideoIdFromUrl(url) {
 
 function setupContextMenus() {
   if (!browser.contextMenus) return;
-  browser.contextMenus.removeAll(() => {
-    browser.contextMenus.create({
-      id: MENU_ADD_ID,
-      title: 'Add to niixtube queue',
-      contexts: ['link'],
-      documentUrlPatterns: ['*://*.youtube.com/*'],
-      targetUrlPatterns: ['*://*.youtube.com/watch*', '*://*.youtube.com/shorts/*']
+  // browser.contextMenus.removeAll() is promise-only on Firefox - it does
+  // not invoke a callback argument the way chrome.contextMenus.removeAll()
+  // does. The previous callback-style call here meant the create() calls
+  // nested inside it were effectively dead code on Firefox: removeAll()
+  // would resolve internally, but nothing ever called back into our
+  // function, so the right-click menu items were never (re)created. Using
+  // .then() instead works identically via the promise on both browsers.
+  browser.contextMenus
+    .removeAll()
+    .then(() => {
+      browser.contextMenus.create({
+        id: MENU_ADD_ID,
+        title: 'Add to niixtube queue',
+        contexts: ['link'],
+        documentUrlPatterns: ['*://*.youtube.com/*'],
+        targetUrlPatterns: ['*://*.youtube.com/watch*', '*://*.youtube.com/shorts/*']
+      });
+      browser.contextMenus.create({
+        id: MENU_NEXT_ID,
+        title: 'Enqueue next (niixtube)',
+        contexts: ['link'],
+        documentUrlPatterns: ['*://*.youtube.com/*'],
+        targetUrlPatterns: ['*://*.youtube.com/watch*', '*://*.youtube.com/shorts/*']
+      });
+    })
+    .catch(() => {
+      /* Non-fatal - worst case the context menu items are briefly missing
+         until the next call to this function (onInstalled/onStartup/every
+         script re-run) succeeds. */
     });
-    browser.contextMenus.create({
-      id: MENU_NEXT_ID,
-      title: 'Enqueue next (niixtube)',
-      contexts: ['link'],
-      documentUrlPatterns: ['*://*.youtube.com/*'],
-      targetUrlPatterns: ['*://*.youtube.com/watch*', '*://*.youtube.com/shorts/*']
-    });
-  });
 }
 
 if (browser.contextMenus) {

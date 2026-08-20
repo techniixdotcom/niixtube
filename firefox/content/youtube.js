@@ -4,16 +4,30 @@
   const DEFAULT_SETTINGS = {
     subscriptionsOnlyHome: true,
     greyOutWatched: true,
+    watchedBadge: true,
     hideShorts: true,
     autoContinueWatching: true,
     enqueueEnabled: true,
     watchedThreshold: 95
   };
 
+  // Sanity check before any extracted ID is used to build a fetch() URL or
+  // a thumbnail src - loose enough to tolerate a future format change (real
+  // IDs are always 11 chars) without breaking outright.
+  const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,15}$/;
+
   const SELECTORS = {
     videoRenderer:
       'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer',
-    progressBar: 'ytd-thumbnail-overlay-resume-playback-renderer #progress',
+    // YouTube has been migrating this element to a newer web-component
+    // design system (yt-thumbnail-overlay-progress-bar-view-model, with
+    // classes like ytThumbnailOverlayProgressBarHostWatchedProgressBar*)
+    // alongside the older ytd-thumbnail-overlay-resume-playback-renderer,
+    // rolled out inconsistently across accounts/pages - so both are matched.
+    progressBar:
+      'ytd-thumbnail-overlay-resume-playback-renderer #progress, ' +
+      '[class*="ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment"], ' +
+      'yt-thumbnail-overlay-progress-bar-view-model [class*="WatchedProgressBarSegment"]',
     thumbnailLink: 'a#thumbnail',
     thumbnailHost: 'ytd-thumbnail',
     videoTitle: '#video-title, #video-title-link',
@@ -62,9 +76,10 @@
     if (!href) return null;
     try {
       const url = new URL(href, window.location.origin);
-      if (url.pathname === '/watch') return url.searchParams.get('v');
-      if (url.pathname.startsWith('/shorts/')) return url.pathname.split('/')[2] || null;
-      return null;
+      let id = null;
+      if (url.pathname === '/watch') id = url.searchParams.get('v');
+      else if (url.pathname.startsWith('/shorts/')) id = url.pathname.split('/')[2] || null;
+      return id && VIDEO_ID_PATTERN.test(id) ? id : null;
     } catch (err) {
       return null;
     }
@@ -215,22 +230,65 @@
   }
 
   // ---------- Feature 2: grey out fully watched videos ----------
+  function readProgressBarPercent(bar) {
+    // Old component exposes the watched percentage directly as an inline
+    // style="width: N%" on the bar itself.
+    const inlineWidth = parseFloat((bar.style && bar.style.width) || '');
+    if (!Number.isNaN(inlineWidth)) return inlineWidth;
+
+    // The newer view-model component doesn't reliably set that inline
+    // style, so fall back to measuring the filled segment against its
+    // track's rendered width - works regardless of how the percentage is
+    // actually implemented under the hood (CSS var, flex-basis, etc.).
+    const track = bar.parentElement;
+    if (track && track.offsetWidth > 0) {
+      const pct = (bar.offsetWidth / track.offsetWidth) * 100;
+      if (Number.isFinite(pct) && pct > 0) return pct;
+    }
+    return null;
+  }
+
   function applyGreyOutWatchedItem(item) {
     if (!state.settings.greyOutWatched) {
       item.classList.remove('niixtube-watched');
+      removeWatchedBadge(item);
       return;
     }
     const bar = item.querySelector(SELECTORS.progressBar);
     if (!bar) {
       item.classList.remove('niixtube-watched');
+      removeWatchedBadge(item);
       return;
     }
-    const width = parseFloat((bar.style && bar.style.width) || '0');
-    if (width >= state.settings.watchedThreshold) {
+    const width = readProgressBarPercent(bar);
+    if (width !== null && width >= state.settings.watchedThreshold) {
       item.classList.add('niixtube-watched');
+      if (state.settings.watchedBadge) {
+        addWatchedBadge(item);
+      } else {
+        removeWatchedBadge(item);
+      }
     } else {
       item.classList.remove('niixtube-watched');
+      removeWatchedBadge(item);
     }
+  }
+
+  function addWatchedBadge(item) {
+    const host = item.querySelector(SELECTORS.thumbnailHost);
+    if (!host || host.querySelector('.niixtube-watched-badge')) return;
+    // Reused by the enqueue-button feature too - idempotent, so it's safe
+    // to add here even when enqueue is off.
+    host.classList.add('niixtube-thumb-relative');
+    const badge = document.createElement('div');
+    badge.className = 'niixtube-watched-badge';
+    badge.textContent = 'Watched';
+    host.appendChild(badge);
+  }
+
+  function removeWatchedBadge(item) {
+    const badge = item.querySelector('.niixtube-watched-badge');
+    if (badge) badge.remove();
   }
 
   // ---------- Feature 4: hide Shorts ----------
@@ -405,7 +463,10 @@
   async function handleContextEnqueueMessage(message) {
     const videoId = message.videoId;
     const next = message.next === true;
-    if (!videoId) return;
+    // The background script already validates this before sending it, but
+    // messages are a trust boundary in their own right - re-check here
+    // rather than assume the sender's shape held.
+    if (!videoId || !VIDEO_ID_PATTERN.test(videoId)) return;
     let context = findVideoContextById(videoId);
     if (!context) {
       // Nothing on the current page matched this link (common when

@@ -2,6 +2,9 @@
 
 const listEl = document.getElementById('queueList');
 const emptyMsg = document.getElementById('emptyMsg');
+// Guards the URL built in playNow() below - defense in depth in case a
+// malformed entry ever ends up in stored queue data.
+const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,15}$/;
 
 async function send(type, payload) {
   return browser.runtime.sendMessage({ type, ...(payload || {}) });
@@ -23,6 +26,7 @@ async function removeItem(videoId) {
 }
 
 async function playNow(item, queue) {
+  if (!item || !VIDEO_ID_PATTERN.test(item.videoId || '')) return;
   const filtered = queue.filter((entry) => entry.videoId !== item.videoId);
   await send('REORDER_QUEUE', { queue: filtered });
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });

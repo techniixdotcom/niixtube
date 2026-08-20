@@ -11,13 +11,15 @@
   },
   "permissions": [
     "storage",
-    "tabs",
     "contextMenus"
   ],
   "host_permissions": [
-    "*://www.youtube.com/*",
-    "*://m.youtube.com/*"
+    "https://www.youtube.com/*",
+    "https://m.youtube.com/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "background": {
     "scripts": [
       "background.js"
@@ -40,8 +42,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://www.youtube.com/*",
-        "*://m.youtube.com/*"
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*"
       ],
       "js": [
         "lib/browser-polyfill.js",

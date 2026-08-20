@@ -17,6 +17,29 @@
   position: relative;
 }
 
+.niixtube-watched-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.85);
+  color: #ffffff;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  /* This is a DOM descendant of the same element .niixtube-watched dims, so
+     its own opacity/grayscale still compounds with the parent's - CSS
+     opacity on an ancestor can't be undone by a child. High-contrast
+     black/white was chosen specifically so it stays readable even after
+     that compounding (roughly 0.85 alpha black x 0.35 parent opacity is
+     still solid enough to read against a desaturated thumbnail). */
+}
+
 html.niixtube-hide-shorts ytd-reel-shelf-renderer,
 html.niixtube-hide-shorts ytd-rich-shelf-renderer[is-shorts],
 html.niixtube-hide-shorts ytd-mini-guide-entry-renderer a[aria-label="Shorts"],
