@@ -11,6 +11,8 @@ Extension handles Enqueue and has Enqueue Next function
 Grey out watched videos (user defines threshold in %)
 
 
+
+
 INSTALL:
 
 
