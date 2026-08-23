@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "niixtube",
+  "version": "1.0.0",
+  "description": "YouTube on your terms: subscriptions-only home sorted newest first, greyed-out watched videos, a single-tab enqueue playback queue (with right-click menu support), hidden Shorts, and seamless continue-watching.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["storage", "contextMenus"],
+  "host_permissions": ["https://www.youtube.com/*", "https://m.youtube.com/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "niixtube",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*", "https://m.youtube.com/*"],
+      "js": ["lib/browser-polyfill.js", "content/youtube.js"],
+      "css": ["content/styles.css"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "minimum_chrome_version": "110"
+}
