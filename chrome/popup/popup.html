@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>niixtube</title>
+<link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+<header>
+  <h1>niixtube <span id="versionLabel" class="version-label"></span></h1>
+  <button id="openOptions" title="Settings" aria-label="Settings">&#9881;</button>
+</header>
+<section id="queueSection">
+  <div class="queue-header">
+    <span>Queue <span id="queueTotalTime" class="queue-total-time"></span></span>
+    <button id="clearQueue">Clear</button>
+  </div>
+  <ul id="queueList"></ul>
+  <p id="emptyMsg" class="empty-msg">Queue is empty. Use the +Q button on any video thumbnail or on the watch page.</p>
+</section>
+<script src="../lib/browser-polyfill.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

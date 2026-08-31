@@ -1,0 +1,214 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  width: 360px;
+  max-height: 520px;
+  background: #0f0f0f;
+  color: #f1f1f1;
+  font-family: "Roboto", Arial, sans-serif;
+  overflow-y: auto;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #272727;
+  position: sticky;
+  top: 0;
+  background: #0f0f0f;
+  z-index: 1;
+}
+
+header h1 {
+  font-size: 16px;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.version-label {
+  font-size: 10px;
+  font-weight: 400;
+  color: #7a7a7a;
+  letter-spacing: 0;
+  /* Purely diagnostic: makes it immediately obvious whether the popup
+     you're looking at is actually the build you just installed, rather
+     than a stale unpacked/dev-mode copy the browser never reloaded -
+     this exact confusion has come up more than once. */
+}
+
+header button {
+  background: transparent;
+  border: none;
+  color: #f1f1f1;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+header button:hover {
+  background: #272727;
+}
+
+#queueSection {
+  padding: 10px 14px 14px;
+}
+
+.queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #aaaaaa;
+  margin-bottom: 8px;
+}
+
+.queue-total-time {
+  text-transform: none;
+  letter-spacing: 0;
+  color: #7a7a7a;
+  font-size: 11px;
+}
+
+.queue-header button {
+  background: transparent;
+  border: 1px solid #3f3f3f;
+  color: #f1f1f1;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.queue-header button:hover {
+  background: #272727;
+}
+
+#queueList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #181818;
+  border-radius: 8px;
+  padding: 6px;
+  /* The whole row is a drag target now (see attachDragHandlers() in
+     popup.js), not just the handle icon - .queue-controls button above
+     explicitly sets its own cursor, so it isn't affected by this. */
+  cursor: grab;
+  /* Same reason as the handle previously needed this: without it, touch
+     input treats the first move as a page scroll instead of a drag,
+     everywhere on the row now rather than just on one small icon. */
+  touch-action: none;
+}
+
+.queue-item.dragging {
+  opacity: 0.6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: grabbing;
+}
+
+.queue-drag-handle {
+  background: transparent;
+  border: none;
+  color: #7a7a7a;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: -2px;
+  padding: 4px 2px;
+  flex-shrink: 0;
+  /* Purely a visual "this is draggable" cue now - the actual drag no
+     longer needs to start on this specific element, so it doesn't need
+     its own pointer/touch handling; it just inherits .queue-item's. */
+}
+
+.queue-drag-handle:hover {
+  color: #f1f1f1;
+}
+
+.queue-thumb {
+  width: 72px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #272727;
+  flex-shrink: 0;
+}
+
+.queue-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-title {
+  font-size: 12.5px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.queue-channel {
+  font-size: 11px;
+  color: #aaaaaa;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.queue-controls button {
+  background: #272727;
+  border: none;
+  color: #f1f1f1;
+  border-radius: 4px;
+  width: 22px;
+  height: 18px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.queue-controls button:hover:not(:disabled) {
+  background: #cc0000;
+}
+
+.queue-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.empty-msg {
+  font-size: 12.5px;
+  color: #aaaaaa;
+  text-align: center;
+  padding: 20px 8px;
+  display: none;
+}
