@@ -69,17 +69,71 @@ async function updateBadge() {
   }
 }
 
+function hasDuration(item) {
+  return !!item && typeof item.durationSeconds === 'number' && item.durationSeconds > 0;
+}
+
+/** Reads a video's exact length from the watch page's own embedded player
+ *  response ("lengthSeconds"), which YouTube includes in the page HTML for
+ *  every video. No API key needed, and youtube.com is already a granted
+ *  host. Used to backfill durations for queue items that were enqueued
+ *  from a context where no duration could be scraped (e.g. right-click on
+ *  a plain link) - without it, those items silently excluded themselves
+ *  from the popup's total queue time. Never throws; null on any failure. */
+async function fetchDurationSeconds(videoId) {
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, { credentials: 'include' });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const match = html.match(/"lengthSeconds":"(\d+)"/);
+    if (!match) return null;
+    const seconds = parseInt(match[1], 10);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/** Fetches the duration for a queued item that doesn't have one and writes
+ *  it back into the stored queue. Fire-and-forget from enqueueItem() - the
+ *  enqueue itself never waits on this. */
+async function backfillDuration(videoId) {
+  const seconds = await fetchDurationSeconds(videoId);
+  if (!seconds) return;
+  const { queue } = await browser.storage.local.get('queue');
+  const list = Array.isArray(queue) ? queue : [];
+  let changed = false;
+  const updated = list.map((entry) => {
+    if (entry.videoId === videoId && !hasDuration(entry)) {
+      changed = true;
+      return { ...entry, durationSeconds: seconds };
+    }
+    return entry;
+  });
+  if (changed) await browser.storage.local.set({ queue: updated });
+}
+
 async function enqueueItem(item, playNext) {
   if (!item || !VIDEO_ID_PATTERN.test(item.videoId || '')) return null;
   const { queue } = await browser.storage.local.get('queue');
   const list = Array.isArray(queue) ? queue.slice() : [];
+  // Re-adding a video replaces its existing entry - keep the old entry's
+  // duration if the new one doesn't have it, rather than losing a known
+  // duration to a worse scrape.
+  const existing = list.find((entry) => entry.videoId === item.videoId);
+  const merged = !hasDuration(item) && hasDuration(existing)
+    ? { ...item, durationSeconds: existing.durationSeconds }
+    : item;
   const filtered = list.filter((entry) => entry.videoId !== item.videoId);
   if (playNext) {
-    filtered.unshift(item);
+    filtered.unshift(merged);
   } else {
-    filtered.push(item);
+    filtered.push(merged);
   }
   await browser.storage.local.set({ queue: filtered });
+  if (!hasDuration(merged)) {
+    backfillDuration(merged.videoId).catch(() => {});
+  }
   return filtered;
 }
 
@@ -291,7 +345,13 @@ browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
                 typeof message.thumbnail === 'string' && message.thumbnail
                   ? message.thumbnail
                   : `https://i.ytimg.com/vi/${message.videoId}/hqdefault.jpg`,
-              channel: typeof message.channel === 'string' ? message.channel : ''
+              channel: typeof message.channel === 'string' ? message.channel : '',
+              // The content script often already scraped the duration off
+              // the thumbnail badge - keep it, so right-click enqueues
+              // count toward the popup's total queue time like any other.
+              ...(typeof message.durationSeconds === 'number' && message.durationSeconds > 0
+                ? { durationSeconds: message.durationSeconds }
+                : {})
             }
           : null;
       return undefined;

@@ -223,6 +223,14 @@ async function render() {
   }
 }
 
+// Durations for items enqueued without one (e.g. via right-click) are
+// backfilled asynchronously by the background script after the enqueue -
+// re-render on queue changes so the total time updates while the popup is
+// open instead of only the next time it's opened.
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.queue) render();
+});
+
 document.getElementById('clearQueue').addEventListener('click', async () => {
   await send('CLEAR_QUEUE');
   render();

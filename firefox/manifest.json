@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "niixtube",
-  "version": "3.2.5",
+  "version": "3.2.6",
   "description": "YouTube on your terms: subscriptions-only home sorted newest first, greyed-out watched videos, a single-tab enqueue playback queue (with right-click menu support), hidden Shorts, and seamless continue-watching.",
   "icons": {
     "16": "icons/icon-16.png",

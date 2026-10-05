@@ -60,6 +60,7 @@
     shelfAttempts: 0,
     audioTrackVideoId: null,
     audioTrackAttempts: 0,
+    audioTrackBusy: false,
     watchTitleVideoId: null,
     cachedNextQueueItem: null,
     ytInitialDataChecked: false,
@@ -459,19 +460,29 @@
     return !!menu && menu.offsetParent !== null;
   }
 
-  function closeSettingsPanel(gear) {
-    if (!isSettingsPanelVisible()) return;
-    // Primary: re-click the same button that opened it. This is the
-    // mechanism we KNOW works, since it's literally the toggle used to
-    // open the panel in the first place - unlike a synthetic Escape
-    // keypress, which many custom player UIs (this one very possibly
-    // included) simply don't bind to closing a settings dropdown, since
-    // Escape often means something else in a video player context (e.g.
-    // exiting fullscreen).
-    if (gear) gear.click();
-    if (!isSettingsPanelVisible()) return;
-    // Still open - fall back to a synthetic Escape as a second attempt,
-    // dispatched on the player container specifically rather than
+  function sleepMs(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /** Polls a condition until it's true or the timeout expires. The player's
+   *  settings menu (both its open state AND its item contents) renders
+   *  asynchronously after the gear click - a synchronous query immediately
+   *  after .click() sees an empty or not-yet-attached panel and wrongly
+   *  concludes there is no "Audio track" row, which was the root cause of
+   *  the settings menu being left open on every video: the "nothing to do,
+   *  close the panel" path then ran BEFORE the panel had even rendered,
+   *  saw it as not visible, and never closed it once it appeared. */
+  async function waitFor(condition, timeoutMs, intervalMs = 60) {
+    const deadline = performance.now() + timeoutMs;
+    while (performance.now() < deadline) {
+      if (condition()) return true;
+      await sleepMs(intervalMs);
+    }
+    return condition();
+  }
+
+  function dispatchEscapeToPlayer() {
+    // Dispatched on the player container specifically rather than
     // `document`, so it reaches a listener bound to the player itself
     // rather than only ones on document/window.
     const player = document.querySelector('#movie_player, .html5-video-player') || document;
@@ -487,8 +498,28 @@
     );
   }
 
-  function selectOriginalAudioTrack() {
+  /** Closes the settings panel and VERIFIES it actually closed, retrying a
+   *  few times. This has to be async: right after a gear click (open or
+   *  close) the panel's visibility doesn't update synchronously, so a
+   *  single "click, check, done" pass can both miss a close that hasn't
+   *  applied yet and skip closing a menu that is about to appear. */
+  async function ensureSettingsPanelClosed(gear) {
+    for (let attempt = 0; attempt < 5 && isSettingsPanelVisible(); attempt++) {
+      // Primary: re-click the same button that opened it - the mechanism we
+      // KNOW works, since it's the toggle that opened the panel (unlike a
+      // synthetic Escape, which player UIs don't reliably bind to closing a
+      // settings dropdown).
+      if (gear) gear.click();
+      await sleepMs(150);
+      if (!isSettingsPanelVisible()) return;
+      dispatchEscapeToPlayer();
+      await sleepMs(150);
+    }
+  }
+
+  async function selectOriginalAudioTrack() {
     if (!state.settings.originalAudioTrack) return;
+    if (state.audioTrackBusy) return; // a previous tick's run is still mid-interaction with the menu
     const videoId = currentWatchVideoId();
     if (!videoId) return;
     if (state.audioTrackVideoId !== videoId) {
@@ -496,41 +527,64 @@
       state.audioTrackAttempts = 0;
     }
     if (state.audioTrackAttempts >= MAX_AUDIO_TRACK_ATTEMPTS) return; // give up quietly for this video
-    state.audioTrackAttempts += 1;
 
     const gear = document.querySelector('.ytp-settings-button');
     if (!gear) return; // player chrome not ready yet - retried next cheap tick
 
-    const wasOpen = isSettingsPanelVisible();
-    if (!wasOpen) gear.click();
+    state.audioTrackAttempts += 1;
+    state.audioTrackBusy = true;
+    try {
+      const wasOpen = isSettingsPanelVisible();
+      if (!wasOpen) {
+        gear.click();
+        // Wait for the panel AND its items to actually render before
+        // querying them - see waitFor() above for the failure this fixes.
+        await waitFor(
+          () => isSettingsPanelVisible() && !!document.querySelector('.ytp-menuitem'),
+          900
+        );
+      }
 
-    const audioRow = findPlayerMenuItem((t) => /audio track/i.test(t));
-    if (!audioRow) {
-      // Most videos don't have multiple audio tracks at all - nothing to
-      // switch. Stop retrying for this video rather than reopening the
-      // settings panel every tick for the rest of the watch.
-      state.audioTrackAttempts = MAX_AUDIO_TRACK_ATTEMPTS;
-      if (!wasOpen) closeSettingsPanel(gear);
-      return;
+      const audioRow = findPlayerMenuItem((t) => /audio track/i.test(t));
+      if (!audioRow) {
+        // Most videos don't have multiple audio tracks at all - nothing to
+        // switch. Stop retrying for this video rather than reopening the
+        // settings panel every tick for the rest of the watch.
+        state.audioTrackAttempts = MAX_AUDIO_TRACK_ATTEMPTS;
+        if (!wasOpen) await ensureSettingsPanelClosed(gear);
+        return;
+      }
+      audioRow.click();
+
+      // The audio-track submenu also renders asynchronously after the row
+      // click - give it a moment before looking for the entries.
+      await waitFor(() => !!findPlayerMenuItem((t) => /\boriginal\b/i.test(t)), 900);
+
+      const original =
+        findPlayerMenuItem((t) => /\boriginal\b/i.test(t)) ||
+        findPlayerMenuItem(
+          (t) => t.length > 0 && !/auto[- ]?dub|dubbed|audio description|audio track/i.test(t)
+        );
+      if (!original) {
+        // Couldn't confidently tell which entry is the original track - back
+        // out without guessing, and let the next cheap tick try again rather
+        // than leaving the settings panel open on the audio-track submenu.
+        if (!wasOpen) await ensureSettingsPanelClosed(gear);
+        return;
+      }
+      original.click();
+      state.audioTrackAttempts = MAX_AUDIO_TRACK_ATTEMPTS; // done for this video
+
+      // YouTube normally closes the panel itself after a leaf selection;
+      // give it a beat to do so, then step in if it didn't - but only if
+      // we're the ones who opened it in the first place.
+      await sleepMs(150);
+      if (!wasOpen) await ensureSettingsPanelClosed(gear);
+    } catch (err) {
+      console.warn('[niixtube]', err);
+    } finally {
+      state.audioTrackBusy = false;
     }
-    audioRow.click();
-
-    const original =
-      findPlayerMenuItem((t) => /\boriginal\b/i.test(t)) ||
-      findPlayerMenuItem((t) => t.length > 0 && !/auto[- ]?dub|dubbed|audio description/i.test(t));
-    if (!original) {
-      // Couldn't confidently tell which entry is the original track - back
-      // out without guessing, and let the next cheap tick try again rather
-      // than leaving the settings panel open on the audio-track submenu.
-      if (!wasOpen) closeSettingsPanel(gear);
-      return;
-    }
-    original.click();
-    state.audioTrackAttempts = MAX_AUDIO_TRACK_ATTEMPTS; // done for this video
-
-    // YouTube normally closes the panel itself after a leaf selection; only
-    // step in if it's still open, and only if we're the ones who opened it.
-    if (!wasOpen) closeSettingsPanel(gear);
   }
 
   // ---------- Feature 2: grey out fully watched videos ----------
@@ -756,7 +810,9 @@
     if (fromPageData) return fromPageData;
 
     const known = item.querySelector(
-      'ytd-thumbnail-overlay-time-status-renderer #text, .ytd-thumbnail-overlay-time-status-renderer, [class*="ThumbnailOverlayBadge" i], [class*="badge-shape" i]'
+      'ytd-thumbnail-overlay-time-status-renderer #text, yt-thumbnail-overlay-time-status-renderer #text, ' +
+        '.ytd-thumbnail-overlay-time-status-renderer, yt-thumbnail-badge-view-model, ' +
+        '[class*="ThumbnailOverlayBadge" i], [class*="ThumbnailBadge" i], [class*="badge-shape" i]'
     );
     if (known) {
       const parsed = parseDurationText(known.textContent);
